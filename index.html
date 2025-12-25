@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M3U8 批量字幕下載合併器 v2.2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; }
+        .log-box {
+            font-family: 'Courier New', Courier, monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .log-box::-webkit-scrollbar { width: 8px; }
+        .log-box::-webkit-scrollbar-track { background: #1f2937; }
+        .log-box::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        
+        /* 增加教學步驟的樣式 */
+        .step-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.5rem;
+            height: 1.5rem;
+            background-color: #3b82f6;
+            color: white;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin-right: 0.5rem;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-white w-full max-w-3xl rounded-xl shadow-xl overflow-hidden">
+        <div class="bg-purple-700 p-6 text-white">
+            <h1 class="text-2xl font-bold mb-2">📋 M3U8 批量字幕下載合併器 v2.2</h1>
+            <p class="text-purple-100 text-sm opacity-90">專治動態密鑰影片，一次搞定 200+ 個片段</p>
+        </div>
+
+        <div class="p-6 md:p-8 space-y-6">
+            
+            <!-- 教學區塊 (優化版) -->
+            <div class="bg-blue-50 border-l-4 border-blue-500 p-5 space-y-4">
+                <h2 class="font-bold text-lg text-blue-900 flex items-center">
+                    🔍 兩步驟取得資料 (請先按 F12 開啟開發者工具)
+                </h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-gray-700">
+                    <!-- 左邊：找檔案 -->
+                    <div class="space-y-2">
+                        <p class="font-bold text-blue-700 border-b border-blue-200 pb-1">第一步：找到關鍵檔案</p>
+                        <ul class="space-y-2">
+                            <li class="flex items-start"><span class="step-badge">1</span>切換到 <strong>Network (網路)</strong> 分頁。</li>
+                            <li class="flex items-start"><span class="step-badge">2</span>在過濾搜尋框輸入 <code>m3u8</code>。</li>
+                            <li class="flex items-start"><span class="step-badge">3</span>重新整理網頁，或拉動影片進度條。</li>
+                            <li class="flex items-start"><span class="step-badge">4</span>找到名稱類似 <code>subtitles.m3u8</code> 的檔案。</li>
+                        </ul>
+                    </div>
+
+                    <!-- 右邊：二選一 -->
+                    <div class="space-y-2">
+                        <p class="font-bold text-blue-700 border-b border-blue-200 pb-1">第二步：複製 (二選一)</p>
+                        
+                        <div class="bg-white p-2 rounded border border-blue-100 shadow-sm">
+                            <span class="text-xs font-bold text-purple-600 bg-purple-100 px-1 rounded">方法 A (簡單)</span>
+                            <p class="mt-1">對該檔案按右鍵 -> Copy -> <strong>Copy link address (複製連結網址)</strong>，然後貼到下面。</p>
+                        </div>
+
+                        <div class="bg-white p-2 rounded border border-blue-100 shadow-sm">
+                            <span class="text-xs font-bold text-green-600 bg-green-100 px-1 rounded">方法 B (最穩)</span>
+                            <p class="mt-1">點擊該檔案，右側切換到 <strong>Preview (預覽)</strong> 或 <strong>Response</strong> 分頁。點擊內容區，按 <strong>Ctrl+A 全選</strong>並複製所有文字，然後貼到下面。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 輸入區 -->
+            <div>
+                <label class="block text-gray-700 font-bold mb-2 flex justify-between">
+                    <span>貼上區域</span>
+                    <span class="text-xs font-normal text-gray-400 self-end">支援：.m3u8 網址 或 #EXTM3U 內容</span>
+                </label>
+                <textarea 
+                    id="contentInput" 
+                    rows="6"
+                    placeholder="請在此貼上..."
+                    class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500 transition text-xs font-mono bg-gray-50"
+                ></textarea>
+                <div class="flex justify-between items-center mt-2">
+                    <p class="text-sm text-gray-500" id="linkCountText">等待輸入...</p>
+                    <button onclick="clearInput()" class="text-xs text-red-500 hover:text-red-700 hover:underline">清空內容</button>
+                </div>
+            </div>
+
+            <!-- 控制按鈕 -->
+            <button 
+                id="startBtn"
+                onclick="processInputAndStart()" 
+                class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed group"
+            >
+                <span class="group-hover:scale-110 transition-transform">🚀</span>
+                解析並開始下載
+            </button>
+
+            <!-- 進度條 -->
+            <div id="progressContainer" class="hidden space-y-2">
+                <div class="flex justify-between text-sm font-medium text-gray-600">
+                    <span id="statusText">準備中...</span>
+                    <span id="counterText">0 / 0</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden shadow-inner">
+                    <div id="progressBar" class="bg-gradient-to-r from-purple-500 to-indigo-600 h-3 rounded-full w-0 transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- 記錄區 -->
+            <div class="bg-gray-900 text-green-400 p-4 rounded-lg h-48 overflow-y-auto text-xs log-box shadow-inner border border-gray-700" id="logBox">
+                <span class="text-gray-500">系統準備就緒，等待使用者輸入...</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const logBox = document.getElementById('logBox');
+        const contentInput = document.getElementById('contentInput');
+        const linkCountText = document.getElementById('linkCountText');
+        const startBtn = document.getElementById('startBtn');
+        const progressBar = document.getElementById('progressBar');
+        const progressContainer = document.getElementById('progressContainer');
+        const statusText = document.getElementById('statusText');
+        const counterText = document.getElementById('counterText');
+
+        // 輸入框監聽：簡單判斷輸入的是網址還是內容
+        contentInput.addEventListener('input', () => {
+            const text = contentInput.value.trim();
+            if (text.length === 0) {
+                linkCountText.innerText = '等待輸入...';
+                return;
+            }
+            
+            if (isM3U8Url(text)) {
+                linkCountText.innerHTML = '<span class="text-blue-600 font-bold">🔗 偵測到網址模式</span> (點擊按鈕後程式將自動解析)';
+            } else {
+                const urls = extractVttUrls(text);
+                if (urls.length > 0) {
+                    linkCountText.innerHTML = `<span class="text-purple-600 font-bold">📄 偵測到內容模式</span> (包含 ${urls.length} 個片段)`;
+                } else {
+                    linkCountText.innerHTML = '<span class="text-red-500">⚠️ 格式似乎不正確，找不到 .vtt 連結</span>';
+                }
+            }
+        });
+
+        function clearInput() {
+            contentInput.value = '';
+            linkCountText.innerText = '等待輸入...';
+            contentInput.focus();
+        }
+
+        function isM3U8Url(text) {
+            // 簡單檢查：是 http 開頭，並且包含 .m3u8，且不包含換行 (避免誤判多行內容)
+            return /^https?:\/\/.+\.m3u8.*$/i.test(text) && !text.includes('\n');
+        }
+
+        function extractVttUrls(text) {
+            // Regex：抓取 http 開頭且包含 .vtt 的連結
+            const regex = /https?:\/\/[^\s"']+\.vtt[^\s"']*/g;
+            return text.match(regex) || [];
+        }
+
+        function log(msg, type = 'info') {
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+            let color = 'text-green-400';
+            if (type === 'error') color = 'text-red-400';
+            if (type === 'warn') color = 'text-yellow-400';
+            
+            // 清除初始提示
+            if(logBox.innerHTML.includes('系統準備就緒')) logBox.innerHTML = '';
+            
+            logBox.innerHTML += `<div class="${color} mb-1 border-l-2 pl-2 ${type==='error'?'border-red-500':(type==='warn'?'border-yellow-500':'border-green-600')}"><span class="opacity-50 select-none">[${time}]</span> ${msg}</div>`;
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        async function processInputAndStart() {
+            let text = contentInput.value.trim();
+            if (!text) {
+                alert("請先貼上網址或內容！");
+                return;
+            }
+
+            // UI Reset
+            logBox.innerHTML = '';
+            startBtn.disabled = true;
+            progressContainer.classList.remove('hidden');
+            progressBar.style.width = '0%';
+            progressBar.classList.remove('bg-green-500'); // Reset color
+
+            // 1. 判斷輸入的是網址還是內容
+            if (isM3U8Url(text)) {
+                log("🔍 偵測到 M3U8 網址，嘗試請求內容...");
+                try {
+                    const response = await fetch(text);
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    text = await response.text();
+                    log("✅ 成功取得清單內容！正在解析...");
+                } catch (e) {
+                    log(`❌ 無法直接讀取網址 (${e.message})`, 'error');
+                    log(`💡 這是瀏覽器安全限制 (CORS)。請改用「方法 B」：`, 'warn');
+                    log(`1. 複製該網址，在新分頁打開`, 'warn');
+                    log(`2. 全選 (Ctrl+A) 畫面上的文字並複製`, 'warn');
+                    log(`3. 回來這裡貼上`, 'warn');
+                    
+                    if(confirm("無法直接抓取 (CORS 限制)。\n是否要在新視窗開啟該網址？\n\n(開啟後請複製所有內容，再貼回這裡)")) {
+                        window.open(contentInput.value.trim(), '_blank');
+                    }
+                    
+                    startBtn.disabled = false;
+                    return;
+                }
+            }
+
+            // 2. 解析 VTT 連結
+            const urls = extractVttUrls(text);
+            if (urls.length === 0) {
+                log("❌ 錯誤：找不到任何 .vtt 連結！", 'error');
+                log("💡 請確認你貼上的是正確的 subtitles.m3u8 內容。", 'warn');
+                alert("找不到 .vtt 連結！\n請確認內容是否正確。");
+                startBtn.disabled = false;
+                return;
+            }
+
+            log(`🚀 解析成功！共發現 ${urls.length} 個字幕片段，開始下載...`);
+            await startBatchDownload(urls);
+        }
+
+        async function startBatchDownload(urls) {
+            let finalContent = "";
+            let successCount = 0;
+            let failCount = 0;
+
+            for (let i = 0; i < urls.length; i++) {
+                const url = urls[i];
+                // 更新 UI
+                statusText.innerText = `處理中... (${i + 1}/${urls.length})`;
+                const percentage = Math.round(((i + 1) / urls.length) * 100);
+                counterText.innerText = `${percentage}%`;
+                progressBar.style.width = `${percentage}%`;
+
+                try {
+                    // 隨機延遲 50~150ms，避免過快被擋
+                    await new Promise(r => setTimeout(r, 50 + Math.random() * 100));
+
+                    const content = await fetchSegment(url);
+                    
+                    if (content) {
+                        if (i === 0) {
+                            finalContent += content;
+                        } else {
+                            finalContent += cleanVttContent(content);
+                        }
+                        log(`✅ [${i+1}] 下載成功`);
+                        successCount++;
+                    } else {
+                        log(`❌ [${i+1}] 下載失敗 (404/403)`, 'error');
+                        failCount++;
+                    }
+                } catch (e) {
+                    log(`❌ [${i+1}] 錯誤: ${e.message}`, 'error');
+                    failCount++;
+                }
+            }
+            
+            if (finalContent.length > 0) {
+                downloadFile(finalContent, "full_course_subtitle_batch.vtt");
+                log(`✨ 全部完成！成功: ${successCount}, 失敗: ${failCount}`);
+                statusText.innerText = "完成！檔案已下載";
+                progressBar.classList.add('bg-green-500'); // Success color
+            } else {
+                log("❌ 全部下載失敗，請檢查網址是否過期。", 'error');
+                statusText.innerText = "失敗";
+                progressBar.classList.add('bg-red-500');
+            }
+
+            startBtn.disabled = false;
+        }
+
+        async function fetchSegment(url) {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) return null;
+                return await response.text();
+            } catch (error) {
+                return null;
+            }
+        }
+
+        function cleanVttContent(rawText) {
+            const lines = rawText.split('\n');
+            let output = "";
+            let headerPassed = false;
+            for (let line of lines) {
+                if (!headerPassed) {
+                    if (line.includes('-->')) {
+                        headerPassed = true;
+                        output += "\n" + line + "\n"; 
+                    }
+                } else {
+                    output += line + "\n";
+                }
+            }
+            return output;
+        }
+
+        function downloadFile(content, fileName) {
+            const blob = new Blob([content], { type: 'text/vtt;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
